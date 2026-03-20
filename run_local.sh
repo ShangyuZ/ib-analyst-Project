@@ -24,7 +24,7 @@ fi
 IB_INPUT="$INPUT" python3 -c "
 import sys, os
 sys.path.insert(0, 'src')
-sys.argv = ['ib-analyst', '--input', os.environ['IB_INPUT'], '--format', 'html']
+sys.argv = ['ib-analyst', '--input', os.environ['IB_INPUT']]
 from ib_analyst.cli import app
 app()
 "
