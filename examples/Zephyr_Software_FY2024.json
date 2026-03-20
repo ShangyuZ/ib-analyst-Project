@@ -1,0 +1,68 @@
+{
+  "company": {
+    "name": "Zephyr Software",
+    "ticker": "ZPHY",
+    "sector": "Technology Software",
+    "fiscal_year": "2024",
+    "currency": "USD",
+    "period": "FY2024"
+  },
+  "income_statement": {
+    "revenue": 18500.0,
+    "gross_profit": 12580.0,
+    "ebitda": 5000.0,
+    "ebit": 4100.0,
+    "net_income": 3200.0,
+    "eps_diluted": 6.85,
+    "gross_margin": 68.0,
+    "ebitda_margin": null,
+    "net_margin": 17.3
+  },
+  "balance_sheet": {
+    "total_assets": 28400.0,
+    "total_debt": 2200.0,
+    "cash_and_equivalents": 5800.0,
+    "total_equity": 19600.0,
+    "working_capital": null
+  },
+  "cash_flow": {
+    "operating_cash_flow": null,
+    "capex": -800.0,
+    "dividends_paid": null,
+    "free_cash_flow": 3400.0
+  },
+  "yoy_changes": {
+    "revenue": 12.0,
+    "net_income": 24.0,
+    "eps_diluted": 22.0
+  },
+  "segments": [
+    {
+      "name": "Cloud Services",
+      "revenue": 11200.0,
+      "operating_income": 3500.0,
+      "revenue_growth_yoy": 18.0
+    },
+    {
+      "name": "Software Licensing",
+      "revenue": 5100.0,
+      "operating_income": 1800.0,
+      "revenue_growth_yoy": 3.0
+    },
+    {
+      "name": "Professional Services",
+      "revenue": 2200.0,
+      "operating_income": 250.0,
+      "revenue_growth_yoy": 8.0
+    }
+  ],
+  "guidance": {
+    "revenue_low": 17800.0,
+    "revenue_high": 18200.0,
+    "ebitda_low": null,
+    "ebitda_high": null,
+    "eps_low": 6.40,
+    "eps_high": 6.60,
+    "commentary": "Management guided for continued cloud momentum and margin improvement through H2."
+  }
+}

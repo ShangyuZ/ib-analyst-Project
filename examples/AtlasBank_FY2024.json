@@ -1,0 +1,56 @@
+{
+  "company": {
+    "name": "AtlasBank",
+    "ticker": "ATLB",
+    "sector": "Financial Services",
+    "fiscal_year": "2024",
+    "currency": "USD",
+    "period": "FY2024"
+  },
+  "income_statement": {
+    "revenue": 84600.0,
+    "gross_profit": null,
+    "ebitda": null,
+    "ebit": 6800.0,
+    "net_income": 5085.0,
+    "eps_diluted": null,
+    "gross_margin": null,
+    "ebitda_margin": null,
+    "net_margin": 11.0
+  },
+  "balance_sheet": {
+    "total_assets": 1560000.0,
+    "total_debt": null,
+    "cash_and_equivalents": null,
+    "total_equity": 85000.0,
+    "working_capital": null
+  },
+  "cash_flow": {
+    "operating_cash_flow": null,
+    "capex": null,
+    "dividends_paid": null
+  },
+  "yoy_changes": {
+    "revenue": 15.0,
+    "ebitda": null,
+    "net_income": -80.0,
+    "eps_diluted": null
+  },
+  "segments": [
+    {
+      "name": "Global Wealth Management",
+      "revenue": 6100.0,
+      "operating_income": null,
+      "revenue_growth_yoy": null
+    }
+  ],
+  "guidance": {
+    "revenue_low": null,
+    "revenue_high": null,
+    "ebitda_low": null,
+    "ebitda_high": null,
+    "eps_low": null,
+    "eps_high": null,
+    "commentary": null
+  }
+}
