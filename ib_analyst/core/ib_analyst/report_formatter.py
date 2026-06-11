@@ -252,19 +252,109 @@ def format_html(data: FinancialData, note_body: str) -> str:
     limitations_html = _limitations_block_html(missing) if missing else ""
 
     css = """
-    body { font-family: Georgia, serif; max-width: 860px; margin: 48px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.7; }
-    h1 { font-size: 1.6rem; border-bottom: 2px solid #1a1a1a; padding-bottom: 8px; margin-bottom: 4px; }
-    h2 { font-size: 1.15rem; margin-top: 2rem; color: #1a1a1a; border-left: 3px solid #555; padding-left: 10px; }
-    .meta { color: #555; font-size: 0.9rem; margin-bottom: 1.5rem; }
-    table { border-collapse: collapse; width: 100%; margin: 1rem 0 1.5rem; font-size: 0.95rem; }
-    th { background: #1a1a1a; color: #fff; text-align: left; padding: 8px 12px; }
-    td { padding: 7px 12px; border-bottom: 1px solid #e0e0e0; }
-    tr:nth-child(even) td { background: #f7f7f7; }
-    ul { padding-left: 1.4rem; }
-    li { margin-bottom: 0.4rem; }
-    hr { border: none; border-top: 1px solid #ddd; margin: 2rem 0; }
-    p { margin: 0.6rem 0; }
-    em { color: #555; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0;
+      color: #1c1c1c;
+      line-height: 1.65;
+      background: #f4f4f4;
+    }
+    .report-wrapper {
+      background: #ffffff;
+      margin: 36px auto;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+    }
+    /* ── Header band ── */
+    .report-header {
+      background: #0d1b2a;
+      color: #ffffff;
+      padding: 28px 36px 22px;
+    }
+    .report-header h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      margin: 0 0 6px;
+      letter-spacing: 0.01em;
+      color: #ffffff;
+      border: none;
+    }
+    .report-header .meta {
+      color: #a8bbd0;
+      font-size: 0.82rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    /* ── Metrics table ── */
+    .metrics-section {
+      padding: 0 36px;
+      border-bottom: 1px solid #e4e4e4;
+      background: #f9f9f9;
+    }
+    .metrics-section h2 {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #6b7280;
+      margin: 0;
+      padding: 16px 0 8px;
+      border: none;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 0 0 16px;
+      font-size: 0.88rem;
+    }
+    thead th {
+      background: #0d1b2a;
+      color: #c9d8e8;
+      text-align: left;
+      padding: 7px 14px;
+      font-weight: 600;
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    td {
+      padding: 7px 14px;
+      border-bottom: 1px solid #ebebeb;
+      color: #1c1c1c;
+    }
+    tr:nth-child(even) td { background: #f5f7fa; }
+    /* ── Body content ── */
+    .report-body {
+      padding: 28px 36px 36px;
+    }
+    h2 {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #0d1b2a;
+      margin-top: 2rem;
+      margin-bottom: 0.5rem;
+      padding-bottom: 5px;
+      border-bottom: 2px solid #0d1b2a;
+    }
+    p { margin: 0.5rem 0 0.7rem; font-size: 0.93rem; }
+    ul, ol { padding-left: 1.3rem; margin: 0.4rem 0 0.8rem; }
+    li { margin-bottom: 0.45rem; font-size: 0.93rem; }
+    hr { border: none; border-top: 1px solid #e4e4e4; margin: 1.8rem 0; }
+    strong { color: #0d1b2a; }
+    em { color: #6b7280; font-style: italic; }
+    /* ── Footer disclaimer ── */
+    .disclaimer {
+      background: #f0f4f8;
+      border-top: 1px solid #d1dde8;
+      padding: 10px 36px;
+      font-size: 0.75rem;
+      color: #6b7280;
+      text-align: center;
+    }
     """
 
     return f"""<!DOCTYPE html>
@@ -276,21 +366,32 @@ def format_html(data: FinancialData, note_body: str) -> str:
   <style>{css}</style>
 </head>
 <body>
-  <h1>{title}</h1>
-  <div class="meta">{meta_html}</div>
+<div class="report-wrapper">
+  <div class="report-header">
+    <h1>{title}</h1>
+    <div class="meta">{meta_html}</div>
+  </div>
 
-  <h2>Key Metrics</h2>
-  <table>
-    <thead><tr><th>Metric</th><th>Value</th></tr></thead>
-    <tbody>
+  <div class="metrics-section">
+    <h2>Key Metrics</h2>
+    <table>
+      <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+      <tbody>
 {table_rows_html}
-    </tbody>
-  </table>
+      </tbody>
+    </table>
+  </div>
 
-  <hr>
+  <div class="report-body">
+    {body_html}
+    {limitations_html}
+  </div>
 
-  {body_html}
-  {limitations_html}
+  <div class="disclaimer">
+    For informational purposes only. Not a buy/sell recommendation.
+    All figures sourced from provided data; independent verification recommended.
+  </div>
+</div>
 </body>
 </html>
 """

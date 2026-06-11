@@ -3,9 +3,82 @@ from __future__ import annotations
 import json
 from .schema import FinancialData
 
-SYSTEM_PROMPT = """\
+_TONE_INSTRUCTIONS: dict[str, str] = {
+    "conservative": """\
+━━━ TONE INSTRUCTION: CONSERVATIVE ━━━
+Weight risk factors above positives. In the Investment Signal section, set the bar
+for **Positive** higher: require at least two independently confirmed positives with
+no material offsetting risk. Default to **Neutral** when data is mixed or incomplete.
+Highlight what an investor should watch for or protect against. Avoid language that
+implies upside without anchoring it to a specific, quantified data point.
+""",
+    "balanced": """\
+━━━ TONE INSTRUCTION: BALANCED ━━━
+Weigh positives and risks equally. Let the data determine the signal direction.
+Present both the strongest bullish and the strongest bearish case — do not tilt
+the narrative in either direction beyond what the numbers support.
+""",
+    "bullish": """\
+━━━ TONE INSTRUCTION: BULLISH ━━━
+Lead with what is working. In the Investment Signal section, lean toward **Positive**
+where the data permits, but you must still cite a specific quantified counterpoint.
+Highlight near-term and medium-term catalysts explicitly. Never manufacture positives
+not supported by the data — anchor every constructive point to a number.
+""",
+}
+
+# Sector-specific typical P/E and EV/EBITDA ranges for the Comparable Valuation section.
+# Ranges are approximate public-market multiples as of 2024-25 for context only.
+_SECTOR_MULTIPLES: dict[str, dict[str, str]] = {
+    "technology":             {"pe": "25–40×", "ev_ebitda": "18–30×"},
+    "software":               {"pe": "30–55×", "ev_ebitda": "20–40×"},
+    "saas":                   {"pe": "35–60×", "ev_ebitda": "25–45×"},
+    "financials":             {"pe": "10–15×", "ev_ebitda": "n/a (use P/B: 1–2×)"},
+    "financial_services":     {"pe": "10–15×", "ev_ebitda": "n/a (use P/B: 1–2×)"},
+    "healthcare":             {"pe": "18–28×", "ev_ebitda": "12–20×"},
+    "pharma":                 {"pe": "15–25×", "ev_ebitda": "10–18×"},
+    "industrials":            {"pe": "16–24×", "ev_ebitda": "10–16×"},
+    "energy":                 {"pe": "10–18×", "ev_ebitda": "6–12×"},
+    "consumer_staples":       {"pe": "18–28×", "ev_ebitda": "12–18×"},
+    "consumer_discretionary": {"pe": "20–35×", "ev_ebitda": "12–20×"},
+    "real_estate":            {"pe": "20–35×", "ev_ebitda": "15–25×"},
+    "default":                {"pe": "18–25×", "ev_ebitda": "12–18×"},
+}
+
+
+def _resolve_sector_key(sector: str | None) -> str:
+    if not sector:
+        return "default"
+    s = sector.lower()
+    for key in _SECTOR_MULTIPLES:
+        if key in s or s in key:
+            return key
+    # Broader keyword fallback
+    if any(w in s for w in ("tech", "software", "cloud", "semi", "internet")):
+        return "technology"
+    if any(w in s for w in ("bank", "financ", "insur", "asset manag")):
+        return "financials"
+    if any(w in s for w in ("health", "pharma", "bio", "medic", "hospital")):
+        return "healthcare"
+    if any(w in s for w in ("oil", "gas", "mining", "util", "renew", "power")):
+        return "energy"
+    if any(w in s for w in ("retail", "apparel", "luxury", "auto", "consumer disc")):
+        return "consumer_discretionary"
+    if any(w in s for w in ("food", "bever", "grocer", "consumer staple")):
+        return "consumer_staples"
+    if any(w in s for w in ("manufactur", "aerospace", "defense", "logistic", "transport", "industrial")):
+        return "industrials"
+    if any(w in s for w in ("real estate", "reit", "property")):
+        return "real_estate"
+    return "default"
+
+
+def _build_system_prompt(tone: str = "balanced") -> str:
+    tone_block = _TONE_INSTRUCTIONS.get(tone, _TONE_INSTRUCTIONS["balanced"])
+
+    return f"""\
 You are a senior investment banking analyst. Write a concise first-pass analyst note.
-Follow the exact 5-section structure below. No preamble, no closing remarks, no filler.
+Follow the exact 6-section structure below. No preamble, no closing remarks, no filler.
 
 ━━━ ANALYTICAL STANDARD ━━━
 Lead with interpretation, not description.
@@ -51,6 +124,8 @@ Apply every applicable rule; skip rules where data is absent.
 5. Banking/financials: Use sector-appropriate framing (net interest income, cost-to-income,
    capital adequacy). Do not apply industrial-company margin logic.
 
+{tone_block}
+
 ━━━ SECTIONS ━━━
 
 ## Profitability Analysis
@@ -89,10 +164,24 @@ Exactly 3 bullets.
   key metric to monitor next period.
 Do not repeat figures already stated above. Synthesise to a decision-relevant point.
 
+## Comparable Valuation Context
+2–3 sentences. Reference typical public-market multiples for the sector (P/E and
+EV/EBITDA) that are supplied in the user message. Comment on what premium or discount
+those ranges imply given this company's margin profile, growth rate, and leverage.
+- If EPS, EBITDA, and sector multiples are all available, state the implied valuation
+  range explicitly (e.g. "at the sector median EV/EBITDA of X×, EBITDA of $Ym implies
+  enterprise value of ~$Zm").
+- If data is insufficient for an implied EV range, note what additional information
+  (market cap, share price, or enterprise value) would be required.
+- Keep this section factual: stated multiples are sector norms, not price targets.
+
 ## Investment Signal
 One bolded signal word on its own line, then 2–3 sentences, then the disclaimer.
 - Signal: exactly **Positive**, **Neutral**, or **Cautious**
-- Cite the 2–3 data points that most directly drive the signal.
+- Near-term catalyst (within next 2 quarters): cite the single most time-sensitive
+  data point or event that could move the signal.
+- Medium-term catalyst (next 1–2 years): cite the structural trend or strategic
+  initiative most likely to drive re-rating.
 - Acknowledge the single most important counterpoint in one clause.
 - If data is too sparse for a directional call, use **Neutral** and state what data
   would change it.
@@ -101,7 +190,11 @@ One bolded signal word on its own line, then 2–3 sentences, then the disclaime
 """
 
 
-def build_user_message(data: FinancialData) -> str:
+# Backwards-compatible constant (used by dry-run display when no tone is specified)
+SYSTEM_PROMPT = _build_system_prompt(tone="balanced")
+
+
+def build_user_message(data: FinancialData, tone: str = "balanced") -> str:
     c = data.company
 
     context_lines = [f"Company:     {c.name}"]
@@ -113,6 +206,18 @@ def build_user_message(data: FinancialData) -> str:
         context_lines.append(f"Sector:      {c.sector}")
     if c.currency:
         context_lines.append(f"Currency:    {c.currency} (all monetary figures in millions)")
+
+    # Inject sector multiple context for the Comparable Valuation section
+    sector_key = _resolve_sector_key(c.sector)
+    multiples = _SECTOR_MULTIPLES[sector_key]
+    context_lines.append(
+        f"Sector multiples (typical public-market, for context only): "
+        f"P/E {multiples['pe']}, EV/EBITDA {multiples['ev_ebitda']}"
+    )
+
+    if tone != "balanced":
+        context_lines.append(f"Analyst tone: {tone.upper()}")
+
     context = "\n".join(context_lines)
 
     payload = data.model_dump(exclude_none=True)
