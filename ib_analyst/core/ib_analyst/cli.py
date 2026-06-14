@@ -1,6 +1,9 @@
+"""cli.py — Typer-based CLI entry point for the IB Analyst Note Generator."""
 from __future__ import annotations
 
 import json
+import logging
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -15,12 +18,28 @@ from .report_formatter import format_html, format_markdown
 from .schema import FinancialData
 from .validators import validate_financial_data
 
+logger = logging.getLogger(__name__)
+
 app = typer.Typer(add_completion=False, help="Generate IB analyst notes from structured financial data.")
 console = Console()
 err_console = Console(stderr=True)
 
-_VALID_TONES = ("conservative", "balanced", "bullish")
-_VALID_FORMATS = ("markdown", "html")
+_VALID_TONES: tuple[str, ...] = ("conservative", "balanced", "bullish")
+_VALID_FORMATS: tuple[str, ...] = ("markdown", "html")
+
+
+def _configure_logging(verbose: bool) -> None:
+    """Configure the root logger.
+
+    Args:
+        verbose: If True, set level to DEBUG; otherwise WARNING.
+    """
+    level = logging.DEBUG if verbose else logging.WARNING
+    logging.basicConfig(
+        format="%(levelname)s %(name)s: %(message)s",
+        level=level,
+        stream=sys.stderr,
+    )
 
 
 @app.command()
@@ -39,10 +58,15 @@ def main(
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Validate input and print prompt; skip report generation."),
     use_llm: bool = typer.Option(False, "--use-llm", help="Use Claude AI (requires ANTHROPIC_API_KEY)."),
+    verbose: bool = typer.Option(False, "--verbose", help="Enable DEBUG-level logging to stderr."),
 ) -> None:
+    """Generate a structured IB analyst note from a JSON financial data file."""
+    _configure_logging(verbose=verbose)
+    logger.debug("CLI invoked: input=%s, format=%s, tone=%s, use_llm=%s", input, format, tone, use_llm)
+
     # 1. Load JSON
     try:
-        raw_dict = json.loads(input.read_text())
+        raw_dict: dict = json.loads(input.read_text())
     except json.JSONDecodeError as e:
         err_console.print(f"[red]JSON parse error:[/red] {e}")
         raise typer.Exit(1)
@@ -60,11 +84,13 @@ def main(
     c = data.company
     label = f"{c.name}{f' ({c.ticker})' if c.ticker else ''}{f', {c.period or c.fiscal_year}' if c.period or c.fiscal_year else ''}"
     console.print(f"[green]✓[/green]  Input validated — {label}")
+    logger.debug("Schema validation passed for: %s", label)
 
     # Financial logic validation (warnings only — analyst can still produce a partial report)
     val_warnings, _val_errors = validate_financial_data(raw_dict)
     for w in val_warnings:
         console.print(f"[yellow][WARN][/yellow] {w}")
+        logger.warning("Financial validation: %s", w)
 
     # 3. Validate tone
     if tone not in _VALID_TONES:
@@ -83,12 +109,13 @@ def main(
         raise typer.Exit(1)
 
     # 6. Generate note body
-    system_prompt = _build_system_prompt(tone=tone)
+    system_prompt: str = _build_system_prompt(tone=tone)
     if use_llm:
         tone_label = "" if tone == "balanced" else f" [{tone}]"
         console.print(f"   Mode: [bold]Claude AI[/bold]{tone_label}")
+        logger.debug("Calling Claude API: model=%s", model)
         try:
-            note_body = generate_note(
+            note_body: str = generate_note(
                 system=system_prompt,
                 user_message=build_user_message(data, tone=tone),
                 model=model,
@@ -96,7 +123,9 @@ def main(
         except Exception as e:
             err_console.print(f"[red]API error:[/red] {e}")
             err_console.print("[yellow]Tip:[/yellow] Ensure ANTHROPIC_API_KEY is set in your environment or .env file.")
+            logger.exception("Claude API call failed")
             raise typer.Exit(1)
+        logger.debug("Claude API response received")
     else:
         console.print(
             "[yellow]⚠  Local mode[/yellow] — rule-based output for development/testing only. "
@@ -106,7 +135,7 @@ def main(
 
     # 7. Format report
     if format == "html":
-        report = format_html(data, note_body)
+        report: str = format_html(data, note_body)
         ext = "html"
     else:
         report = format_markdown(data, note_body)
@@ -129,3 +158,4 @@ def main(
 
     output.write_text(report, encoding="utf-8")
     console.print(f"   Report saved: [bold]{output}[/bold]")
+    logger.info("Report written: %s", output)

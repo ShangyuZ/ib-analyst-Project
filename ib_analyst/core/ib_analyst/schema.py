@@ -34,7 +34,8 @@ class BalanceSheet(BaseModel):
     working_capital: Optional[float] = None
 
     @model_validator(mode="after")
-    def derive_net_debt(self) -> "BalanceSheet":
+    def derive_net_debt(self) -> BalanceSheet:
+        """Derive net_debt = total_debt − cash_and_equivalents if both are present."""
         if self.net_debt is None and self.total_debt is not None and self.cash_and_equivalents is not None:
             self.net_debt = self.total_debt - self.cash_and_equivalents
         return self
@@ -47,7 +48,8 @@ class CashFlow(BaseModel):
     dividends_paid: Optional[float] = None
 
     @model_validator(mode="after")
-    def derive_fcf(self) -> "CashFlow":
+    def derive_fcf(self) -> CashFlow:
+        """Derive free_cash_flow = operating_cash_flow − capex if both are present."""
         if self.free_cash_flow is None and self.operating_cash_flow is not None and self.capex is not None:
             self.free_cash_flow = self.operating_cash_flow - self.capex
         return self

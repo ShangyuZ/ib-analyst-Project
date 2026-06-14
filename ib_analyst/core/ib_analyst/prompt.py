@@ -1,3 +1,11 @@
+"""
+prompt.py — System prompt construction and user message assembly for the AI analyst path.
+
+This module is the analytical core of the IB Analyst Note Generator.  All
+improvements to analytical depth, framing, and sector context belong here.
+The local fallback path (local_analysis.py) is a developer tool only and
+does not receive product-quality analytical enhancements.
+"""
 from __future__ import annotations
 
 import json
@@ -129,17 +137,27 @@ Apply every applicable rule; skip rules where data is absent.
 ━━━ SECTIONS ━━━
 
 ## Profitability Analysis
-3–4 sentences. Lead with the most important analytical point — not the revenue figure.
+3–5 sentences. Lead with the most important analytical point — not the revenue figure.
 - Open with: what the revenue outcome implies (relative to prior period, guidance, or
   segment mix) — not with the revenue level itself.
 - If guidance exists: state midpoint, guidance range, and whether actuals beat /
   came in-line / missed. This is required here, not elsewhere.
+  Guidance credibility: if actuals beat guidance midpoint by more than 5% on revenue
+  OR by more than 10% on EPS, add one sentence on management track record — e.g.
+  "Management has now beaten its own guidance for [N] consecutive periods, which
+  suggests guidance conservatism and may support a higher valuation multiple."
+  If actuals missed guidance midpoint, flag this as a credibility concern to monitor.
 - Use segment data to explain the driver — name the segment, its growth rate, and
   what it implies for the mix or trajectory.
 - Interpret margin levels relative to sector norms if sector is known. Comment on
   direction and magnitude of margin change, not just the current level.
-- If FCF / net income data supports an earnings quality comment, include it.
-  Do not speculate if FCF data is absent.
+- FCF yield and earnings quality: if free_cash_flow and revenue are both present,
+  compute FCF margin (FCF / revenue × 100) and state it explicitly.  If FCF
+  margin exceeds net margin by more than 2pp, note that cash conversion is
+  outpacing reported earnings — a quality signal.  If FCF margin is materially
+  below net margin, flag the divergence and name a plausible cause (working
+  capital build, elevated capex, or accruals).  Do not speculate if FCF data
+  is absent.
 
 ## Risk Observations
 3–5 bullets. Most material risk first.
@@ -194,10 +212,98 @@ One bolded signal word on its own line, then 2–3 sentences, then the disclaime
 SYSTEM_PROMPT = _build_system_prompt(tone="balanced")
 
 
+def _compute_guidance_beat(data: FinancialData) -> list[str]:
+    """Return pre-computed guidance beat/miss annotations for the user message.
+
+    These are passed as analyst context so the model does not have to
+    re-derive them, reducing reasoning errors.
+
+    Args:
+        data: Validated :class:`FinancialData` instance.
+
+    Returns:
+        A list of annotation strings (empty if no guidance data present).
+    """
+    annotations: list[str] = []
+    g = data.guidance
+    inc = data.income_statement
+
+    if g is None:
+        return annotations
+
+    # Revenue vs guidance
+    if g.revenue_low is not None and g.revenue_high is not None and inc.revenue is not None:
+        midpoint: float = (g.revenue_low + g.revenue_high) / 2
+        if midpoint > 0:
+            beat_pct = (inc.revenue - midpoint) / midpoint * 100
+            direction = "beat" if beat_pct > 0 else "missed"
+            annotations.append(
+                f"Revenue guidance: actual {inc.revenue:.1f} vs midpoint {midpoint:.1f} "
+                f"({direction} by {abs(beat_pct):.1f}%)"
+            )
+
+    # EPS vs guidance
+    if g.eps_low is not None and g.eps_high is not None and inc.eps_diluted is not None:
+        eps_mid: float = (g.eps_low + g.eps_high) / 2
+        if eps_mid != 0:
+            eps_beat_pct = (inc.eps_diluted - eps_mid) / abs(eps_mid) * 100
+            direction = "beat" if eps_beat_pct > 0 else "missed"
+            annotations.append(
+                f"EPS guidance: actual {inc.eps_diluted:.2f} vs midpoint {eps_mid:.2f} "
+                f"({direction} by {abs(eps_beat_pct):.1f}%)"
+            )
+
+    return annotations
+
+
+def _compute_fcf_context(data: FinancialData) -> list[str]:
+    """Return pre-computed FCF margin and quality annotations for the user message.
+
+    Args:
+        data: Validated :class:`FinancialData` instance.
+
+    Returns:
+        A list of annotation strings (empty if FCF or revenue data is absent).
+    """
+    annotations: list[str] = []
+    inc = data.income_statement
+    cf = data.cash_flow
+
+    if cf.free_cash_flow is not None and inc.revenue is not None and inc.revenue > 0:
+        fcf_margin = (cf.free_cash_flow / inc.revenue) * 100
+        annotations.append(f"FCF margin (FCF / revenue): {fcf_margin:.1f}%")
+
+        if inc.net_margin is not None:
+            delta = fcf_margin - inc.net_margin
+            if delta > 2.0:
+                annotations.append(
+                    f"FCF margin exceeds net margin by {delta:.1f}pp — cash conversion outpacing reported earnings"
+                )
+            elif delta < -2.0:
+                annotations.append(
+                    f"FCF margin trails net margin by {abs(delta):.1f}pp — earnings quality warrants scrutiny"
+                )
+
+    return annotations
+
+
 def build_user_message(data: FinancialData, tone: str = "balanced") -> str:
+    """Assemble the user message sent to Claude for analyst note generation.
+
+    Pre-computes derived metrics (FCF margin, guidance beat/miss percentages)
+    and injects them as context so the model has accurate anchors for
+    its analytical commentary.
+
+    Args:
+        data: Validated :class:`FinancialData` instance.
+        tone: Analyst tone key — ``"conservative"``, ``"balanced"``, or ``"bullish"``.
+
+    Returns:
+        The complete user message string.
+    """
     c = data.company
 
-    context_lines = [f"Company:     {c.name}"]
+    context_lines: list[str] = [f"Company:     {c.name}"]
     if c.ticker:
         context_lines.append(f"Ticker:      {c.ticker}")
     if c.period or c.fiscal_year:
@@ -217,6 +323,15 @@ def build_user_message(data: FinancialData, tone: str = "balanced") -> str:
 
     if tone != "balanced":
         context_lines.append(f"Analyst tone: {tone.upper()}")
+
+    # Pre-computed analytics to anchor the model
+    guidance_notes = _compute_guidance_beat(data)
+    fcf_notes = _compute_fcf_context(data)
+    if guidance_notes or fcf_notes:
+        context_lines.append("")
+        context_lines.append("Pre-computed analytics (use these values directly — do not re-derive):")
+        for note in guidance_notes + fcf_notes:
+            context_lines.append(f"  • {note}")
 
     context = "\n".join(context_lines)
 

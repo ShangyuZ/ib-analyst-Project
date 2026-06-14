@@ -4,6 +4,7 @@ validators.py — Financial data logical sanity checks.
 Works on a plain dict (the JSON payload) so it can be reused
 independently of any specific model class.
 """
+from __future__ import annotations
 
 
 def validate_financial_data(payload: dict) -> tuple[list[str], list[str]]:
@@ -21,30 +22,30 @@ def validate_financial_data(payload: dict) -> tuple[list[str], list[str]]:
             obj = obj.get(k)
         return obj
 
-    income = payload.get("income_statement") or {}
-    guidance = payload.get("guidance") or {}
+    income: dict = payload.get("income_statement") or {}
+    guidance: dict = payload.get("guidance") or {}
 
-    revenue = income.get("revenue")
-    gross_profit = income.get("gross_profit")
-    ebitda = income.get("ebitda")
-    net_income = income.get("net_income")
-    gross_margin = income.get("gross_margin")
-    ebitda_margin = income.get("ebitda_margin")
-    net_margin = income.get("net_margin")
+    revenue: float | None = income.get("revenue")
+    gross_profit: float | None = income.get("gross_profit")
+    ebitda: float | None = income.get("ebitda")
+    net_income: float | None = income.get("net_income")
+    gross_margin: float | None = income.get("gross_margin")
+    ebitda_margin: float | None = income.get("ebitda_margin")
+    net_margin: float | None = income.get("net_margin")
 
-    balance = payload.get("balance_sheet") or {}
-    total_debt = balance.get("total_debt")
-    cash = balance.get("cash_and_equivalents")
+    balance: dict = payload.get("balance_sheet") or {}
+    total_debt: float | None = balance.get("total_debt")
+    cash: float | None = balance.get("cash_and_equivalents")
 
-    cash_flow = payload.get("cash_flow") or {}
-    ocf = cash_flow.get("operating_cash_flow")
-    capex = cash_flow.get("capex")
+    cash_flow: dict = payload.get("cash_flow") or {}
+    ocf: float | None = cash_flow.get("operating_cash_flow")
+    capex: float | None = cash_flow.get("capex")
 
     # ------------------------------------------------------------------
     # Check: all top-level sections are empty / all fields null
     # ------------------------------------------------------------------
-    all_values = [revenue, gross_profit, ebitda, net_income,
-                  total_debt, cash, ocf, capex]
+    all_values: list[float | None] = [revenue, gross_profit, ebitda, net_income,
+                                       total_debt, cash, ocf, capex]
     if all(v is None for v in all_values):
         errors.append("All financial fields are null — extraction appears to have completely failed")
         # Return early; remaining checks are meaningless
@@ -92,7 +93,7 @@ def validate_financial_data(payload: dict) -> tuple[list[str], list[str]]:
     # ------------------------------------------------------------------
     # Margin range 0–100% (WARNING)
     # ------------------------------------------------------------------
-    margin_fields = [
+    margin_fields: list[tuple[str, float | None]] = [
         ("Gross margin", gross_margin),
         ("EBITDA margin", ebitda_margin),
         ("Net margin", net_margin),
@@ -106,7 +107,7 @@ def validate_financial_data(payload: dict) -> tuple[list[str], list[str]]:
     # ------------------------------------------------------------------
     # Guidance low ≤ high (ERROR)
     # ------------------------------------------------------------------
-    pairs = [
+    pairs: list[tuple[str, float | None, float | None]] = [
         ("revenue", guidance.get("revenue_low"), guidance.get("revenue_high")),
         ("ebitda",  guidance.get("ebitda_low"),  guidance.get("ebitda_high")),
         ("eps",     guidance.get("eps_low"),     guidance.get("eps_high")),

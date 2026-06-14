@@ -1,3 +1,8 @@
+"""sector_benchmarks.py — Sector-specific threshold tables for the local/fallback analysis path.
+
+This module is used exclusively by local_analysis.py.  It is NOT part of the main
+product experience — the AI path handles sector framing through the system prompt.
+"""
 from __future__ import annotations
 
 # ---------------------------------------------------------------------------
