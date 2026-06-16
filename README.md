@@ -1,5 +1,9 @@
 # IB Analyst
 
+![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
+![CI](https://github.com/ShangyuZ/ib-analyst-Project/actions/workflows/ci.yml/badge.svg)
+
 **Turn a JSON file of company financials into a professional analyst note — in seconds.**
 
 ---

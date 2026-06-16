@@ -287,6 +287,31 @@ def _compute_fcf_context(data: FinancialData) -> list[str]:
     return annotations
 
 
+def _check_data_sufficiency(data: FinancialData) -> tuple[int, int]:
+    """Count present vs total tracked financial fields.
+
+    Args:
+        data: Validated :class:`FinancialData` instance.
+
+    Returns:
+        A ``(present, total)`` tuple of field counts.
+    """
+    inc = data.income_statement
+    bs = data.balance_sheet
+    cf = data.cash_flow
+
+    tracked = [
+        inc.revenue, inc.gross_profit, inc.ebitda, inc.ebit, inc.net_income,
+        inc.eps_diluted, inc.gross_margin, inc.ebitda_margin, inc.net_margin,
+        bs.total_assets, bs.total_debt, bs.cash_and_equivalents, bs.net_debt,
+        bs.total_equity, bs.working_capital,
+        cf.operating_cash_flow, cf.capex, cf.free_cash_flow, cf.dividends_paid,
+    ]
+    total = len(tracked)
+    present = sum(1 for v in tracked if v is not None)
+    return present, total
+
+
 def build_user_message(data: FinancialData, tone: str = "balanced") -> str:
     """Assemble the user message sent to Claude for analyst note generation.
 
@@ -335,6 +360,21 @@ def build_user_message(data: FinancialData, tone: str = "balanced") -> str:
 
     context = "\n".join(context_lines)
 
+    # Data sufficiency check — warn model if >30% of fields are missing
+    present, total = _check_data_sufficiency(data)
+    missing_pct = (total - present) / total * 100
+    if missing_pct > 30:
+        missing_count = total - present
+        context_lines.append(
+            f"\n⚠ DATA SUFFICIENCY WARNING: {missing_count}/{total} tracked financial fields "
+            f"are absent ({missing_pct:.0f}% missing). "
+            "Your note MUST open with a prominent one-sentence caveat stating that the analysis "
+            "is materially constrained by data gaps, and you should avoid strong directional "
+            "conclusions where key inputs are absent. Flag specific missing fields by name where "
+            "they would have changed the analysis."
+        )
+
+    context = "\n".join(context_lines)
     payload = data.model_dump(exclude_none=True)
     pretty = json.dumps(payload, indent=2)
 
